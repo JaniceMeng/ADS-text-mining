@@ -1,6 +1,6 @@
 # Applied Data Science @ Columbia
 ## Fall 2018
-## Project 1: What made you happy today? :blush::moneybag::moneybag::moneybag::blush:
+## Project 1: What made you happy today? :jp::kr::cn::us::fr::es::it::ru::gb::uk::de:
 
 ![image](figs/World_Bank_high-income_economies.png)
 
