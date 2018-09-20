@@ -460,7 +460,7 @@ topics.terms
 
 
 
-```{r}
+```{r Warning=F}
 #Set parameters for Gibbs sampling
 burnin <- 4000
 iter <- 2000
@@ -503,7 +503,7 @@ topics_hie.terms
 
 
 
-```{r}
+```{r Warning=F}
 #Set parameters for Gibbs sampling
 burnin <- 4000
 iter <- 2000
