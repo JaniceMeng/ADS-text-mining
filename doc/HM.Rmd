@@ -1,0 +1,669 @@
+---
+title: "HappyMoment"
+author: "Yimeng Qiu"
+date: "9/18/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1.introduction
+What is the most important thing for your life? Money? Social Status? Achievement? Contribution? For me, happy is my long term pursuit. Though this project, we will analyize over 100,000 record about the idividuals' happy moments. Utilizing text mining and NLP methods, we will find out the source of happyness. I seperate the dataset apart accourding to the High Income Economy countries list, so the focus of this project is to explore weather the level of economic development of country influnce the happyness of its citizen? Is any difference of happy source between two groups? Will the sentiment analysis and topic model analysis despribe the difference of two group. Let's start our research!
+
+# 2. Preparation
+Check and install needed packages. Load the libraries and functions.
+
+```{r, message=FALSE, warning=FALSE}
+packages.used=c("rvest", "tibble", "qdap", 
+                "sentimentr", "gplots", "dplyr",
+                "tm", "syuzhet", "factoextra", 
+                "beeswarm", "scales", "RColorBrewer",
+                "RANN", "tm", "topicmodels")
+
+# check packages that need to be installed.
+packages.needed=setdiff(packages.used, 
+                        intersect(installed.packages()[,1], 
+                                  packages.used))
+# install additional packages
+if(length(packages.needed)>0){
+  install.packages(packages.needed, dependencies = TRUE)
+}
+
+# load packages
+library("rvest")
+library("tibble")
+library("sentimentr")
+library("gplots")
+library("dplyr")
+library("tm")
+library("syuzhet")
+library("factoextra")
+library("beeswarm")
+library("scales")
+library("RColorBrewer")
+library("RANN")
+library("tm")
+library("topicmodels")
+library("tidyverse")
+library("tidytext")
+library("DT")
+library("wordcloud2")
+library("gridExtra")
+library("ngram")
+library("wordcloud")
+```
+
+
+
+# 3. Data Harvest
+
+## Step 1: load the cleaned_hm.csv and demographic.csv from https://rit-public.github.io/HappyDB/
+
+```{r load data, warning=FALSE, message=FALSE}
+hm_data <- read_csv("../output/processed_moments.csv")
+
+urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/demographic.csv'
+demo_data <- read_csv(urlfile)
+```
+
+## Step 2: Scrapping the country list from https://en.wikipedia.org/wiki/Developed_country by using python. 
+The definition of High Income Economy is from https://en.wikipedia.org/wiki/World_Bank_high-income_economy
+
+```{r}
+hie <- read.table('/Users/Janice/Documents/GitHub/2018adsfallproject1/data/HIE.csv',header = F,as.is = T)[[1]]
+
+```
+
+
+## Step 3: Basic data wrangling, and seperate the dataset apart accourding to the definition of HIE.
+
+```{r combining data, warning=FALSE, message=FALSE}
+hm_data <- hm_data %>%
+  inner_join(demo_data, by = "wid") %>%
+  select(wid,
+         original_hm,
+         gender, 
+         marital, 
+         parenthood,
+         reflection_period,
+         age, 
+         country, 
+         ground_truth_category, 
+         text) %>%
+  mutate(count = sapply(hm_data$text, wordcount)) %>%
+  filter(gender %in% c("m", "f")) %>%
+  filter(marital %in% c("single", "married")) %>%
+  filter(parenthood %in% c("n", "y")) %>%
+  filter(reflection_period %in% c("24h", "3m")) %>%
+  mutate(reflection_period = fct_recode(reflection_period, 
+                                        months_3 = "3m", hours_24 = "24h"))
+
+
+countrylist <- names(table(hm_data$country))
+nhie <- countrylist[!(countrylist %in% hie)]
+
+hie_data <- hm_data %>%
+  filter(country %in% hie)
+
+nhie_data <- hm_data %>%
+  filter(!country %in% hie)
+```
+
+
+# 4. What is the difference of happy source between two groups?
+Assume that the order of words does not matter, here, we first conduct a preliminary research on what the most frequently mentioned words are in the happy moment dataset. In order to make the analysis more practical, stop words such as ???I???, ???am??? and punctuation are removed. 
+
+```{r bag of words, warning=FALSE, message=FALSE}
+bag_of_words <-  hm_data %>%
+  unnest_tokens(word, text)
+
+word_count <- bag_of_words %>%
+  count(word, sort = TRUE)
+
+bag_of_hie <-  hie_data %>%
+  unnest_tokens(word, text)
+
+word_hie <- bag_of_hie %>%
+  count(word, sort = TRUE)
+
+bag_of_nhie <-  nhie_data %>%
+  unnest_tokens(word, text)
+
+word_nhie <- bag_of_nhie %>%
+  count(word, sort = TRUE)
+```
+
+
+Because the first there words are the same for both two group, I choose the later 20 words from the fourth one to find the the difference. From the general word frequency wordcloud, the happy source is about life, staying with family. One of interesting discovering in this research is that the daught is a bigger happy source for HIE countries and son is for not HIE countries. Maybe there are some political or cultural explanation behind this finding.
+
+
+```{r, warning=FALSE}
+par(mfrow=c(3,1))
+word_count.1 = word_count[4:nrow(word_count),]
+wordcloud(word_count.1$word, word_count.1$n,  # the wordcloud of total dataset
+          scale=c(5,0.005),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=F,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Greens"))
+
+word_hie.1 = word_hie[4:nrow(word_hie),]
+wordcloud(word_hie.1$word,word_hie.1$n,  # the wordcloud of HIE group
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=F,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+
+word_nhie.1 = word_hie[4:nrow(word_nhie),]
+wordcloud(word_nhie.1$word,word_nhie.1$n,  # the wordcloud of not the HIE group
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=F,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Reds"))
+```
+
+
+List the frequency of words from the fourth one for both groups. The words frequency of HIE countries is decreasing linearly, however, the none HIE countries has huge gap between the first word 'moment' and the second word 'life'. From my understanding, I guess maybe this is becuase most of none HIE countries do not speak English, which will cuase some gramma problem to record the happy moments sentence. The happy moments words from HIE countries are clear, more about family, work; on the other side, none HIE countries, the happy moments words are hard to interpretate, not as logical as the first group. Compared with HIE group, it is more about personal experience.
+
+
+```{r}
+word_hie$n <- word_hie$n/sum(word_hie$n)
+word_nhie$n <- word_nhie$n/sum(word_nhie$n)
+#barplot
+par(mfrow=c(2,1))
+ggplot(word_hie[4:23,],aes(x = reorder(word, -n), y = n))+geom_bar(stat="identity",fill='#66a0ff')+theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggplot(word_nhie[4:23,],aes(x = reorder(word, -n), y = n))+geom_bar(stat="identity", fill = "#FF6666")+theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+
+# 5. Can emotion analysis help us to explane the difference behind two groups?
+
+## Step 1: convert the data to emotion index matrix from NRC.
+
+from the cumulative barchart, ignoring the last four nagetive emotion, we can the HIE countries emphasize the anticipation more than those none HIE countries; the none HIE countries people need to more trust.
+
+```{r}
+senti_data <- bag_of_words %>%
+  select(wid,word) %>%
+  inner_join(get_sentiments("nrc")) %>%
+  filter(!sentiment %in% c('positive','negative')) %>%
+  left_join(bag_of_words)
+
+senti_table <- as.data.frame(table(senti_data$sentiment))
+senti_table$Freq <- senti_table$Freq/sum(senti_table$Freq)
+
+senti_hic <- bag_of_hie %>%
+  select(wid,word) %>%
+  inner_join(get_sentiments("nrc")) %>%
+  filter(!sentiment %in% c('positive','negative')) %>%
+  left_join(bag_of_hie)
+
+senti_hic_table <- as.data.frame(table(senti_hic$sentiment))
+senti_hic_table$Freq <- senti_hic_table$Freq/sum(senti_hic_table$Freq)
+senti_hic_table$type <- rep('HIE',8)
+
+senti_nhic <- bag_of_nhie %>%
+  select(wid,word) %>%
+  inner_join(get_sentiments("nrc")) %>%
+  filter(!sentiment %in% c('positive','negative')) %>%
+  left_join(bag_of_nhie)
+
+senti_nhic_table <- as.data.frame(table(senti_nhic$sentiment))
+senti_nhic_table$Freq <- senti_nhic_table$Freq/sum(senti_nhic_table$Freq)
+senti_nhic_table$type <- rep('NHIE',8)
+
+senti_total_table <- rbind(senti_nhic_table,senti_hic_table)
+
+ggplot(senti_total_table,aes(x=reorder(Var1,-Freq),y=Freq))+geom_bar(stat="identity",aes(fill = type),width = 0.4,    position = position_dodge(width=0.8)) +  
+   theme(legend.position="top", legend.title = 
+   element_blank(),axis.title.x=element_blank(), 
+   axis.title.y=element_blank())
+```
+
+## Step 2: using the diffence of sentiment analysis, can we predict the type of country? (HIE or not)
+
+First of all, I calculate avarage sentiment decimal value for each country, and use the sentiment decimal matrix to cluster whole data as two group. From the result for kmeans clustering, I find the sentiment analysis for none HIE countries has relatively higher accuracy rate. I can conclude countries in the none HIE group have some trend in sentiment weight. The accuracy rate for the none HIE gourp is near 0.6.
+
+```{r}
+f <- function(country_df){
+  return(c(table(country_df$sentiment)[]
+           ))
+}
+
+senti.split <- split(senti_data, senti_data$country)
+senti.m <- sapply(senti.split, f)
+
+senti <- names(senti.m[[2]])
+
+senti.cm <- matrix(nrow=length(senti.m),ncol=8,0)
+for (i in 1:length(senti.m)){
+  k = 1
+  for (j in senti){
+    senti.cm[i,k]=ifelse(!is.null(senti.m[[i]][j]),senti.m[[i]][j],0) 
+    k <- k+1
+  }
+}
+colnames(senti.cm) <- senti
+rownames(senti.cm) <- names(senti.m)
+senti.cm[is.na(senti.cm)] <- 0
+senti.sum <- rowSums(senti.cm)
+senti.cm <- senti.cm/senti.sum
+```
+
+
+```{r}
+km.res <- kmeans(senti.cm,2)
+fviz_cluster(km.res, data = senti.cm)
+nhie_hat <- names(km.res$cluster)[km.res$cluster==2]
+hie_hat <- names(km.res$cluster)[km.res$cluster==1]
+
+common_hie <- intersect(hie,hie_hat)
+common_nhie <- intersect(nhie,nhie_hat)
+
+length(common_hie)/length(hie)
+length(common_nhie)/length(nhie)
+```
+
+
+
+
+# 6. Can topic analysis help us to explane the difference behind two groups?
+
+## Step 1: data wrangling
+
+```{r}
+hm_data <- hm_data[sample(1:94574,15000,replace = F),] #my computer reach the calculation limits if I use whole dataset
+
+hie_data <- hm_data %>%
+  filter(country %in% hie)
+
+nhie_data <- hm_data %>%
+  filter(!country %in% hie)
+
+
+docs <- Corpus(VectorSource(hm_data$text))
+writeLines(as.character(docs[[sample(1:nrow(hm_data), 1)]]))
+
+docs.hie <- Corpus(VectorSource(hie_data$text))
+writeLines(as.character(docs[[sample(1:nrow(hie_data), 1)]]))
+
+docs.nhie <- Corpus(VectorSource(nhie_data$text))
+writeLines(as.character(docs[[sample(1:nrow(nhie_data), 1)]]))
+```
+
+data wrangling for whole dataset
+
+```{r}
+#remove potentially problematic symbols
+docs <-tm_map(docs,content_transformer(tolower))
+writeLines(as.character(docs[[sample(1:nrow(hm_data), 1)]]))
+
+#remove punctuation
+docs <- tm_map(docs, removePunctuation)
+writeLines(as.character(docs[[sample(1:nrow(hm_data), 1)]]))
+
+#Strip digits
+docs <- tm_map(docs, removeNumbers)
+writeLines(as.character(docs[[sample(1:nrow(hm_data), 1)]]))
+
+#remove stopwords
+docs <- tm_map(docs, removeWords, stopwords("english"))
+writeLines(as.character(docs[[sample(1:nrow(hm_data), 1)]]))
+
+#remove whitespace
+docs <- tm_map(docs, stripWhitespace)
+writeLines(as.character(docs[[sample(1:nrow(hm_data), 1)]]))
+
+#Stem document
+docs <- tm_map(docs,stemDocument)
+writeLines(as.character(docs[[sample(1:nrow(hm_data), 1)]]))
+```
+
+data wrangling for HIE dataset
+
+```{r warning = F}
+#remove potentially problematic symbols
+docs.hie <-tm_map(docs.hie,content_transformer(tolower))
+writeLines(as.character(docs.hie[[sample(1:nrow(hie_data), 1)]]))
+
+#remove punctuation
+docs.hie <- tm_map(docs.hie, removePunctuation)
+writeLines(as.character(docs.hie[[sample(1:nrow(hie_data), 1)]]))
+
+#Strip digits
+docs.hie <- tm_map(docs.hie, removeNumbers)
+writeLines(as.character(docs.hie[[sample(1:nrow(hie_data), 1)]]))
+
+#remove stopwords
+docs.hie <- tm_map(docs.hie, removeWords, stopwords("english"))
+writeLines(as.character(docs.hie[[sample(1:nrow(hie_data), 1)]]))
+
+#remove whitespace
+docs.hie <- tm_map(docs.hie, stripWhitespace)
+writeLines(as.character(docs.hie[[sample(1:nrow(hie_data), 1)]]))
+
+#Stem document
+docs.hie <- tm_map(docs.hie,stemDocument)
+writeLines(as.character(docs.hie[[sample(1:nrow(hie_data), 1)]]))
+```
+
+data wrangling for none HIE dataset
+
+```{r}
+#remove potentially problematic symbols
+docs.nhie <-tm_map(docs.nhie,content_transformer(tolower))
+writeLines(as.character(docs.nhie[[sample(1:nrow(nhie_data), 1)]]))
+
+#remove punctuation
+docs.nhie <- tm_map(docs.nhie, removePunctuation)
+writeLines(as.character(docs.nhie[[sample(1:nrow(nhie_data), 1)]]))
+
+#Strip digits
+docs.nhie <- tm_map(docs.nhie, removeNumbers)
+writeLines(as.character(docs.nhie[[sample(1:nrow(nhie_data), 1)]]))
+
+#remove stopwords
+docs.nhie <- tm_map(docs.nhie, removeWords, stopwords("english"))
+writeLines(as.character(docs.nhie[[sample(1:nrow(nhie_data), 1)]]))
+
+#remove whitespace
+docs.nhie <- tm_map(docs.nhie, stripWhitespace)
+writeLines(as.character(docs.nhie[[sample(1:nrow(nhie_data), 1)]]))
+
+#Stem document
+docs.nhie <- tm_map(docs.nhie,stemDocument)
+writeLines(as.character(docs.nhie[[sample(1:nrow(nhie_data), 1)]]))
+```
+
+
+
+```{r}
+# get the dtm for whole data
+dtm <- DocumentTermMatrix(docs)
+#convert rownames to filenames#convert rownames to filenames
+rownames(dtm) <- hm_data$wid
+rowTotals <- apply(dtm , 1, sum) #Find the sum of words in each Document
+dtm  <- dtm[rowTotals> 0, ]
+
+
+# get the dtm for HIE group data
+dtm.hie <- DocumentTermMatrix(docs.hie)
+#convert rownames to filenames#convert rownames to filenames
+rownames(dtm.hie) <- hie_data$wid
+rowTotals <- apply(dtm.hie , 1, sum) #Find the sum of words in each Document
+dtm.hie  <- dtm.hie[rowTotals> 0, ]
+
+# get the dtm for none HIE group data
+dtm.nhie <- DocumentTermMatrix(docs.nhie)
+#convert rownames to filenames#convert rownames to filenames
+rownames(dtm.nhie) <- nhie_data$wid
+rowTotals <- apply(dtm.nhie , 1, sum) #Find the sum of words in each Document
+dtm.nhie  <- dtm.nhie[rowTotals> 0, ]
+```
+
+## step 2: training data using topic model
+
+```{r Warning=F}
+#Set parameters for Gibbs sampling
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+
+#Number of topics
+k <- 6
+
+#Run LDA using Gibbs sampling
+ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart, 
+                                                 seed = seed, best=best,
+                                                 burnin = burnin, iter = iter, 
+                                                 thin=thin))
+
+#docs to topics
+ldaOut.topics <- a??s.matrix(topics(ldaOut))
+table(c(1:k, ldaOut.topics))
+
+#top 6 terms in each topic
+ldaOut.terms <- as.matrix(terms(ldaOut,20))
+
+#probabilities associated with each topic assignment
+topicProbabilities <- as.data.frame(ldaOut@gamma)
+```
+
+
+
+```{r}
+terms.beta=ldaOut@beta
+terms.beta=scale(terms.beta)
+topics.terms=NULL
+for(i in 1:k){
+  topics.terms=rbind(topics.terms, ldaOut@terms[order(terms.beta[i,], decreasing = TRUE)[1:7]])
+}
+topics.terms
+```
+
+
+
+```{r}
+#Set parameters for Gibbs sampling
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+
+#Number of topics
+k <- 6
+
+#Run LDA using Gibbs sampling
+ldaOut_hie <-LDA(dtm.hie, k, method="Gibbs", control=list(nstart=nstart, 
+                                                 seed = seed, best=best,
+                                                 burnin = burnin, iter = iter, 
+                                                 thin=thin))
+#write out results
+#docs to topics
+ldaOut_hie.topics <- as.matrix(topics(ldaOut_hie))
+table(c(1:k, ldaOut_hie.topics))
+
+#top 6 terms in each topic
+ldaOut_hie.terms <- as.matrix(terms(ldaOut_hie,20))
+
+#probabilities associated with each topic assignment
+topicProbabilities_hie <- as.data.frame(ldaOut_hie@gamma)
+```
+
+```{r}
+terms_hie.beta=ldaOut_hie@beta
+terms_hie.beta=scale(terms_hie.beta)
+topics_hie.terms=NULL
+for(i in 1:k){
+  topics_hie.terms=rbind(topics_hie.terms, ldaOut_hie@terms[order(terms_hie.beta[i,], decreasing = TRUE)[1:7]])
+}
+topics_hie.terms
+```
+
+
+
+
+
+```{r}
+#Set parameters for Gibbs sampling
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+
+#Number of topics
+k <- 6
+
+#Run LDA using Gibbs sampling
+ldaOut_nhie <-LDA(dtm.nhie, k, method="Gibbs", control=list(nstart=nstart, 
+                                                 seed = seed, best=best,
+                                                 burnin = burnin, iter = iter, 
+                                                 thin=thin))
+#write out results
+#docs to topics
+ldaOut_nhie.topics <- as.matrix(topics(ldaOut_nhie))
+table(c(1:k, ldaOut_nhie.topics))
+
+#top 6 terms in each topic
+ldaOut_nhie.terms <- as.matrix(terms(ldaOut_nhie,20))
+
+#probabilities associated with each topic assignment
+topicProbabilities_nhie <- as.data.frame(ldaOut_nhie@gamma)
+```
+
+
+```{r}
+terms_nhie.beta=ldaOut_nhie@beta
+terms_nhie.beta=scale(terms_nhie.beta)
+topics_nhie.terms=NULL
+for(i in 1:k){
+  topics_nhie.terms=rbind(topics_nhie.terms, ldaOut_nhie@terms[order(terms_nhie.beta[i,], decreasing = TRUE)[1:7]])
+}
+topics_nhie.terms
+```
+
+## Step 3: get the heatmap for two group
+
+```{r}
+# whole data process
+topics.hash=c("Work", "Family", "Achievement", "Friend","Play", "Relax")
+hm_data = hm_data[1:14998,]
+hm_data$ldatopic=as.vector(ldaOut.topics)
+hm_data$ldahash=topics.hash[ldaOut.topics]
+colnames(topicProbabilities)=topics.hash
+corpus.list.df=cbind(hm_data, topicProbabilities)
+```
+
+```{r}
+# HIE data process
+topics.hash.hie=c("Comsuption", "Family", "Friend","Eat", "Achievement", "Work")
+hie_data = hie_data[1:11982,]
+hie_data$ldatopic=as.vector(ldaOut_hie.topics)
+hie_data$ldahash=topics.hash.hie[ldaOut_hie.topics]
+colnames(topicProbabilities_hie)=topics.hash.hie
+corpus_hie.list.df=cbind(hie_data, topicProbabilities_hie)
+```
+
+```{r}
+# none HIE data process
+topics.hash.nhie=c("Excercise", "Family", "Social","Eat", "Achievement", "Travel")
+nhie_data$ldatopic=as.vector(ldaOut_nhie.topics)
+nhie_data$ldahash=topics.hash.nhie[ldaOut_nhie.topics]
+colnames(topicProbabilities_nhie)=topics.hash.nhie
+corpus_nhie.list.df=cbind(nhie_data, topicProbabilities_nhie)
+```
+
+
+
+```{r}
+# get the topic summary for whole dataset
+topic.summary=tbl_df(corpus.list.df)%>%
+  select(country, Work:Relax)%>%
+  group_by(country)%>%
+  summarise_each(funs(mean))
+
+# get the topic summary for HIE group
+topic_hie.summary=tbl_df(corpus_hie.list.df)%>%
+  select(country, Comsuption:Work)%>%
+  group_by(country)%>%
+  summarise_each(funs(mean))
+
+# get the topic summary for noen HIE group
+corpus_nhie.list.df=cbind(nhie_data, topicProbabilities_nhie)
+topic_nhie.summary=tbl_df(corpus_nhie.list.df)%>%
+  select(country, Excercise:Travel)%>%
+  group_by(country)%>%
+  summarise_each(funs(mean))
+```
+
+
+```{r}
+topic_hie.summary=as.data.frame(topic_hie.summary)
+rownames(topic_hie.summary)=topic_hie.summary[,1]
+
+heatmap.2(as.matrix(topic_hie.summary[,2:6]), 
+          scale = "column", key=F, 
+          col = bluered(100),
+          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none")
+
+```
+
+
+
+```{r}
+topic_nhie.summary=as.data.frame(topic_nhie.summary)
+topic_nhie.summary[,1] = c(topic_nhie.summary[,1][-length(topic_nhie.summary[,1])],"BZL")
+rownames(topic_nhie.summary)= topic_nhie.summary[,1]
+
+heatmap.2(as.matrix(topic_nhie.summary[,2:6]), 
+          scale = "column", key=F, 
+          col = bluered(100),
+          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none")
+
+```
+
+
+
+
+## Step 4: using kmeans to cluster whole dataset as two group
+From the clustring result, most coutries are assinged as the same group, which is the reason the accuracy of HIE group cluster is near 0.7. Considering the research, I think, not matter what the development level of country, people's happly moment source are the same.
+
+
+```{r}
+topic.summary=as.data.frame(topic.summary)
+namess = c(as.character((topic.summary[,1]))[-length(as.character((topic.summary[,1])))],'BZL')
+rownames(topic.summary)=namess
+km.res=kmeans(scale(topic.summary[,-1]), iter.max=200,
+              2)
+fviz_cluster(km.res, 
+             stand=T, repel= TRUE,
+             data = topic.summary[,-1],
+             show.clust.cent=FALSE)
+
+nhie_hat <- names(km.res$cluster)[km.res$cluster==2]
+hie_hat <- names(km.res$cluster)[km.res$cluster==1]
+
+common_hie <- intersect(hie,hie_hat)
+common_nhie <- intersect(nhie,nhie_hat)
+
+length(common_hie)/length(hie)
+length(common_nhie)/length(nhie)
+```
+
+
+
+
+
+# Conclusion
+From this topic, I use EDA, sentiment analysis and topic model analysis dig the difference betweent people from Hign Income Economy or not deeper, and find there is indeed some difference between two group. However, the last topic model tells me, generally speaking, the happy sources for all people no matter which country are you from are the same: Family, Friend, Achievement, Travel. From this really interesting project, I know for my long term persuit, I need spend more time with my family and friend, and also work hard to achieve the success of study and work.
+
+
+
+
+
+
+
+
