@@ -2,7 +2,7 @@
 title: "HappyMoment"
 author: "Yimeng Qiu"
 date: "9/18/2018"
-output: html_document
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
