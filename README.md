@@ -10,7 +10,7 @@ This is the first and only *individual* (as opposed to *team*) this semester.
 Term: Fall 2018
 
 + Projec title: Will the economy level of country influence people's happly source?
-+ This project is conducted by Yimeng Qiu
++ This project is conducted by :point_right:Yimeng Qiu
 
 + Project summary: This Project applies text mining and NLP skills such as topic modeling and sentiment analysis on happy moments data. I separate data into two groups, High Income Economy countries and None High Income Economy countries, to see the level of country economy whether influence its citizens’ happyness.
 
