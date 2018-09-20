@@ -113,7 +113,7 @@ nhie_data <- hm_data %>%
 
 
 # 4. What is the difference of happy source between two groups?
-Assume that the order of words does not matter, here, we first conduct a preliminary research on what the most frequently mentioned words are in the happy moment dataset. In order to make the analysis more practical, stop words such as ???I???, ???am??? and punctuation are removed. 
+Assume that the order of words does not matter, here, we first conduct a preliminary research on what the most frequently mentioned words are in the happy moment dataset. In order to make the analysis more practical, stop words such as “I”, “am” and punctuation are removed. 
 
 ```{r bag of words, warning=FALSE, message=FALSE}
 bag_of_words <-  hm_data %>%
@@ -436,7 +436,7 @@ ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart,
                                                  thin=thin))
 
 #docs to topics
-ldaOut.topics <- a??s.matrix(topics(ldaOut))
+ldaOut.topics <- as.matrix(topics(ldaOut))
 table(c(1:k, ldaOut.topics))
 
 #top 6 terms in each topic
@@ -548,7 +548,8 @@ topics_nhie.terms
 ```{r}
 # whole data process
 topics.hash=c("Work", "Family", "Achievement", "Friend","Play", "Relax")
-hm_data = hm_data[1:14998,]
+l = length(ldaOut.topics)
+hm_data = hm_data[1:l,]
 hm_data$ldatopic=as.vector(ldaOut.topics)
 hm_data$ldahash=topics.hash[ldaOut.topics]
 colnames(topicProbabilities)=topics.hash
@@ -558,7 +559,8 @@ corpus.list.df=cbind(hm_data, topicProbabilities)
 ```{r}
 # HIE data process
 topics.hash.hie=c("Comsuption", "Family", "Friend","Eat", "Achievement", "Work")
-hie_data = hie_data[1:11982,]
+l = length(ldaOut_hie.topics)
+hie_data = hie_data[1:l,]
 hie_data$ldatopic=as.vector(ldaOut_hie.topics)
 hie_data$ldahash=topics.hash.hie[ldaOut_hie.topics]
 colnames(topicProbabilities_hie)=topics.hash.hie
@@ -568,6 +570,8 @@ corpus_hie.list.df=cbind(hie_data, topicProbabilities_hie)
 ```{r}
 # none HIE data process
 topics.hash.nhie=c("Excercise", "Family", "Social","Eat", "Achievement", "Travel")
+l = length(ldaOut_nhie.topics)
+nhie_data = nhie_data[1:l,]
 nhie_data$ldatopic=as.vector(ldaOut_nhie.topics)
 nhie_data$ldahash=topics.hash.nhie[ldaOut_nhie.topics]
 colnames(topicProbabilities_nhie)=topics.hash.nhie
@@ -629,7 +633,7 @@ heatmap.2(as.matrix(topic_nhie.summary[,2:6]),
 
 
 ## Step 4: using kmeans to cluster whole dataset as two group
-From the clustring result, most coutries are assinged as the same group, which is the reason the accuracy of HIE group cluster is near 0.7. Considering the research, I think, not matter what the development level of country, people's happly moment source are the same.
+From the clustring result, most coutries are assinged as the same group, which is the reason the accuracy of HIE group cluster not reach 0.5. Considering the research, I think, not matter what the development level of country, people's happly moment source are the same.
 
 
 ```{r}
